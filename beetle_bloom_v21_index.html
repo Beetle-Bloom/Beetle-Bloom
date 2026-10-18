@@ -1,0 +1,245 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Beetle Bloom V21</title><style>body{margin:0;background:#eaf5e5;font-family:system-ui,sans-serif;color:#263c31;text-align:center}main{max-width:440px;margin:auto;padding:14px;position:relative;box-sizing:border-box}h1{margin:8px}#board{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;background:#7d9b78;padding:8px;border-radius:16px;aspect-ratio:1;position:relative;overflow:hidden} .cell{border-radius:5px;box-shadow:inset 0 -3px #0002} .empty{background:#d4e6c9;box-shadow:none}#slots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:12px 0}#queue{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:12px 0}.queuecol{display:flex;flex-direction:column;gap:6px;min-width:0}.queuecol .bug{min-width:0;padding:10px 1px;font-size:16px;width:100%}.queuecol .bug.locked{opacity:.4;filter:grayscale(.35);cursor:not-allowed}.queuecol .bug.front{outline:2px solid #315f46;outline-offset:1px}.bug{border:2px solid #263c3160;border-radius:22px;padding:9px 11px;min-width:42px;background:white;font-size:20px;cursor:pointer;box-shadow:0 3px #0002}.bug:disabled{opacity:.45}.slot{width:53px;height:48px;border:2px dashed #8fa58b;border-radius:12px;display:grid;place-items:center;background:#fff8}.filled{border-style:solid}button{font:inherit;touch-action:manipulation}#status{min-height:40px;font-weight:600}#reset{padding:9px 20px;border:0;border-radius:12px;background:#315f46;color:white} .traveler{position:absolute;left:0;top:0;z-index:1000;pointer-events:none;font-size:24px;width:32px;height:32px;display:grid;place-items:center;filter:drop-shadow(0 2px 2px #3445);will-change:transform}.traveler span{display:grid;place-items:center;width:100%;height:100%}.traveler span{display:block;background:#fff9;border-radius:50%;padding:1px}.cell{transition:opacity .15s,transform .15s}.slot{font-size:17px}.slot.working{background:#e1f5e8}.slot.waiting{background:#fff4d8}#board .cell{min-width:0;min-height:0}#status{padding:8px} 
+/* V11 visual skin — gameplay and movement algorithms retained */
+body{background:radial-gradient(ellipse at 20% 0%,#f9ffe8,#dcf4e5 48%,#b8ddc9);color:#254a3c}
+main{background:linear-gradient(165deg,#ffffffd9,#e9f8e9d9);min-height:100vh;border-left:1px solid #ffffff90;border-right:1px solid #ffffff90;box-shadow:0 6px 40px #23583a1b}
+h1{font-weight:900;letter-spacing:-1px;color:#286a4d;text-shadow:0 2px white}
+h3{margin:12px 0 8px;color:#315f48;font-size:16px}
+p{font-size:12px;line-height:1.35;margin:8px 0;color:#668473}
+#level{display:inline-block;background:#fff9;border:1px solid #b9dfc2;border-radius:50px;padding:4px 18px;font-weight:800;color:#367756}
+#board{background:linear-gradient(150deg,#588b65,#356f56);border:5px solid #d9b87a;box-shadow:0 9px 0 #b48c54,0 15px 25px #305b4435,inset 0 2px 12px #163e2c66;border-radius:19px}
+.cell{border-radius:7px;box-shadow:inset 0 3px 2px #ffffff80,inset 0 -5px 3px #0000002a,0 2px 2px #132b2138;border:1px solid #ffffff3d;box-sizing:border-box}
+.cell.empty{background:#a3c8a5;box-shadow:inset 0 2px 5px #244e3833;border:1px solid #ffffff1f}
+.slot{width:53px;height:52px;border-radius:16px;background:linear-gradient(#fff,#e8f4e9);box-shadow:0 4px 8px #22482c18,inset 0 1px white;overflow:hidden}
+.slot.working{background:#d8f5de}.slot.waiting{background:#fff0d0}
+.bug{border:2px solid #ffffffb0;box-shadow:inset 0 2px #ffffff80,0 4px 0 #20453244,0 6px 8px #1b4d3028;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:2px;color:#204232;font-weight:900;min-height:46px}
+.queuecol .bug{padding:6px 1px;font-size:13px}
+.queuecol .bug.front{outline:2px solid #3b8865;outline-offset:1px}
+#reset{background:linear-gradient(#469b70,#246747);font-weight:800;box-shadow:0 4px #17472d;padding:11px 25px}
+#status{font-size:13px;color:#397358}
+.traveler{width:32px;height:32px;font-size:initial;filter:drop-shadow(0 3px 2px #122f2650)}
+.traveler span{background:transparent!important;padding:0!important;box-shadow:none!important;display:grid;place-items:center}
+.beetle{--shell:#ef9d49;display:inline-block;position:relative;width:27px;height:31px;flex:none;filter:drop-shadow(0 2px 1px #14291d4d)}
+.beetle .leg{position:absolute;width:12px;height:3px;background:#283f36;border-radius:4px;top:14px;left:-5px;transform:rotate(28deg)}
+.beetle .leg.r{left:auto;right:-5px;transform:rotate(-28deg)}
+.beetle .leg.mid{top:20px;transform:rotate(-24deg)}.beetle .leg.mid.r{transform:rotate(24deg)}
+.beetle .leg.back{top:25px;transform:rotate(-48deg)}.beetle .leg.back.r{transform:rotate(48deg)}
+.beetle .head{position:absolute;width:15px;height:12px;background:#304b3f;border-radius:60% 60% 40% 40%;top:0;left:6px;z-index:1}
+.beetle .eye{position:absolute;width:4px;height:4px;background:white;border-radius:50%;top:4px;left:8px;z-index:2;box-shadow:9px 0 white}
+.beetle .shell{position:absolute;left:2px;top:9px;width:23px;height:21px;border-radius:48% 48% 53% 53%;background:radial-gradient(ellipse at 32% 25%,#ffffffb0 0%,#ffffff22 26%,transparent 42%),var(--shell);border:1px solid #253b3270;box-shadow:inset -4px -4px 5px #00000028,inset 2px 2px 3px #ffffff70;z-index:2}
+.beetle .shell:after{content:'';position:absolute;top:1px;bottom:1px;left:50%;width:1px;background:#24392d88}
+/* A stable body with six independently animated legs. */
+.traveler .beetle{transform-origin:50% 55%;animation:bodyWalk .30s ease-in-out infinite alternate}
+.traveler .beetle .leg{transform-origin:90% 50%;animation:stepLeft .24s ease-in-out infinite alternate}
+.traveler .beetle .leg.r{transform-origin:10% 50%;animation:stepRight .24s ease-in-out infinite alternate}
+.traveler .beetle .leg.mid{animation-delay:-.12s}
+.traveler .beetle .leg.back{animation-delay:-.24s}
+.traveler .beetle .leg.mid.r{animation-delay:-.24s}
+.traveler .beetle .leg.back.r{animation-delay:-.12s}
+@keyframes bodyWalk{from{transform:translateY(0)}to{transform:translateY(-.65px)}}
+@keyframes stepLeft{from{transform:rotate(-27deg)}to{transform:rotate(37deg)}}
+@keyframes stepRight{from{transform:rotate(27deg)}to{transform:rotate(-37deg)}}
+.traveler .heading{width:32px;height:32px;display:grid;place-items:center;transform-origin:center;will-change:transform}
+/* Beetle face points upward by default. Rotate only the inner heading,
+   never the translated traveler container. */
+.bug,.slot{position:relative}
+.bug .beetle{margin:0;transform:scale(.83)}
+.bug .count,.slot .count{position:absolute;right:2px;top:2px;min-width:19px;height:19px;line-height:19px;border-radius:12px;background:#ffffffed;color:#234838;font-size:12px;font-weight:900;box-shadow:0 1px 3px #0005;z-index:5;text-align:center;border:1px solid #3b6d5440}
+.slot .count{right:1px;top:1px}
+.bug .beetle,.slot .beetle{margin-right:8px}
+
+.bug .beetle{transform:scale(.83);margin:-3px}
+.slot .beetle{transform:scale(.85)}
+.traveler.carrying .beetle:after{content:'';position:absolute;width:13px;height:13px;top:-8px;left:7px;border-radius:3px;background:var(--shell);box-shadow:inset 2px 2px #ffffff80,0 2px 3px #0004}
+@media(max-width:390px){main{padding:9px}.queuecol .bug{font-size:12px}.slot{width:49px}}
+
+.progress{margin:8px auto 12px;max-width:300px;font-size:12px;font-weight:800;color:#367756}.progressTrack{height:9px;border-radius:99px;background:#c4dfc8;overflow:hidden;margin-top:4px;box-shadow:inset 0 1px 3px #0002}#progressFill{height:100%;width:0%;background:linear-gradient(90deg,#65bf85,#e7c75c);transition:width .22s linear;border-radius:99px}.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}.actions button{border:0;border-radius:12px;padding:11px 16px;font-weight:800}#sound{background:#fff;color:#356d50;box-shadow:0 3px #0002}#hint{background:#fff3ca;color:#725a1b;box-shadow:0 3px #0002}#toast{min-height:18px;font-size:12px;color:#477b5b;margin-top:8px}.spark{position:absolute;pointer-events:none;z-index:1002;width:8px;height:8px;border-radius:3px;animation:sparkFly .5s ease-out forwards}@keyframes sparkFly{to{transform:translate(var(--dx),var(--dy)) rotate(150deg) scale(.15);opacity:0}}.traveler.carrying .beetle:after{animation:carryPulse .3s ease-in-out infinite alternate}@keyframes carryPulse{to{transform:translateY(-2px)}}
+
+#victory{position:fixed;inset:0;background:#153b2dbb;z-index:3000;display:grid;place-items:center;padding:20px;box-sizing:border-box}
+.victoryCard{background:linear-gradient(#fffef4,#ddf5df);border:4px solid #e9c879;border-radius:25px;padding:26px 20px;width:min(340px,90vw);box-shadow:0 16px 55px #09261977}
+.victoryCard h2{color:#247450;font-size:27px;margin:12px 0}.victoryCard p{font-size:15px}.victoryFlower{font-size:32px}
+#nextLevel{border:0;border-radius:14px;background:#2e8d61;color:white;padding:14px 25px;font-size:17px;font-weight:900;box-shadow:0 4px #17573a}
+.hintGlow{outline:4px solid #f5b92b!important;outline-offset:3px;animation:hintPulse .7s ease-in-out 3}@keyframes hintPulse{50%{filter:brightness(1.25)}}
+</style></head><body><main><h1>🌸 Beetle Bloom <small style="font-size:13px">V21</small></h1><div id="level"></div><div class="progress"><span id="progressText">0% cleared</span><div class="progressTrack"><div id="progressFill"></div></div></div><p>Clear reachable colors from below. Every fifth level is a harder challenge!</p><div id="board"></div><h3>Waiting slots</h3><div id="slots"></div><h3>Choose a beetle</h3><p>Only the first beetle in each column is available. Select it to unlock the one behind it.</p><div id="queue"></div><div id="status"></div><div class="actions"><button id="reset">Restart level</button><button id="previousLevel" type="button">← Previous</button><button id="skipLevel" type="button">Skip level →</button><button id="hint" type="button">💡 Hint</button><button id="sound" aria-label="Toggle sound">🔊 Sound on</button></div><div id="toast" aria-live="polite"></div></main><script>
+const colors=['#f6c64c','#f17f80','#68b5ed','#a58be1','#68c58d'];
+// Six hand-authored 8x8 patterns. Every cell has a color; beetles enter from below.
+// No hidden layers yet: preserve the approachable core gameplay.
+const levels=[
+ ['00011000','00122100','01233210','12344321','12344321','01233210','00122100','00011000'],
+ ['00111100','01222210','12333321','12344321','12344321','12333321','01222210','00111100'],
+ ['00044000','00433400','04322340','43211234','43211234','04322340','00433400','00044000'],
+ ['00000000','01111110','01222210','01233210','01233210','01222210','01111110','00000000'],
+ ['00112200','00112200','33443344','33443344','44334433','44334433','22110022','22110022'],
+ ['01233210','01233210','12344321','12344321','23400432','23400432','34011043','34011043']
+];
+// Stable variety: six layouts, mirrored versions and five palette rotations.
+// Later levels are variations, not yet individually certified puzzles.
+// V19: variable board geometry, with a special challenge every fifth level.
+let ROWS=8,COLS=8;
+function levelBoard(index){
+ const hard=(index+1)%5===0;
+ const shapes=hard?[[9,9],[10,8],[8,11],[10,10]]:[[5,6],[6,7],[7,8],[8,8],[6,9],[8,10],[9,8]];
+ const [r,c]=shapes[Math.floor(index/(hard?5:1))%shapes.length];ROWS=r;COLS=c;
+ const palette=[0,1,2,3,4].map((_,i)=>(i+index)%5);
+ const style=Math.floor(index/3)%5;
+ const out=[];
+ // Five distinct, deterministic puzzle silhouettes. The bottom boundary is
+ // always a single accessible color, allowing the first beetles to start.
+ for(let y=0;y<r;y++)for(let x=0;x<c;x++){
+  const edge=Math.min(y,x,r-1-y,c-1-x);
+  const fromBottom=r-1-y;
+  let band;
+  if(style===0) band=edge; // nested flower
+  else if(style===1) band=Math.floor((fromBottom+Math.abs(x-Math.floor(c/2))*.55)/2); // valley
+  else if(style===2) band=Math.floor((fromBottom+(x%3===0?1:0))/2); // terraced garden
+  else if(style===3) band=Math.min(edge+Math.floor(Math.abs(x-(c-1)/2)/3),4); // petals
+  else band=Math.floor((fromBottom+Math.floor(x/3))/2); // diagonally stepped beds
+  if(y===r-1) band=0;
+  if(hard&&y<r-1&&y>1&&x>0&&x<c-1&&((x*7+y*11+index)%9<2))band++;
+  out.push(palette[band%5]);
+ }
+ return out;
+}
+const $=id=>document.getElementById(id);
+function beetleHTML(c){return `<span class="beetle" style="--shell:${colors[c]}"><i class="leg"></i><i class="leg r"></i><i class="leg mid"></i><i class="leg mid r"></i><i class="leg back"></i><i class="leg back r"></i><i class="head"></i><i class="eye"></i><i class="shell"></i></span>`}
+let level=0,board=[],queue=[],slots=[],ended=false,clock=null,epoch=0,reserved=new Set(),winTimeout=null;
+function neighbors(i){let r=Math.floor(i/COLS),c=i%COLS,a=[];if(r>0)a.push(i-COLS);if(r<ROWS-1)a.push(i+COLS);if(c>0)a.push(i-1);if(c<COLS-1)a.push(i+1);return a}
+function reachable(){const d=Array(board.length).fill(Infinity),q=[];for(let c=0;c<COLS;c++){let i=(ROWS-1)*COLS+c;if(board[i]===null){d[i]=1;q.push(i)}}for(let k=0;k<q.length;k++){let i=q[k];for(let j of neighbors(i))if(board[j]===null&&d[j]===Infinity){d[j]=d[i]+1;q.push(j)}}return d}
+function targetFor(color,dist){let best=-1,bestCost=Infinity;for(let i=0;i<board.length;i++){if(board[i]!==color||reserved.has(i))continue;let cost=Math.floor(i/COLS)===ROWS-1?0:Infinity;for(let j of neighbors(i))if(board[j]===null&&dist[j]!==Infinity)cost=Math.min(cost,dist[j]);if(cost===Infinity)continue;cost+=Math.abs(i%COLS-(COLS-1)/2)*.001;if(cost<bestCost){bestCost=cost;best=i}}return best}
+let totalBlocks=0,soundOn=true,audioCtx=null;
+try{level=Math.max(0,parseInt(localStorage.getItem('beetleBloomLevel')||'0',10)||0)}catch(e){}
+function beep(freq=560){if(!soundOn)return;try{audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sine';o.frequency.setValueAtTime(freq,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(freq*1.25,audioCtx.currentTime+.09);g.gain.setValueAtTime(.025,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.13);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.14)}catch(e){}}
+function sparkle(target,color){const p=cellPoint(target%COLS,Math.floor(target/COLS)),m=document.querySelector('main');for(let i=0;i<5;i++){let el=document.createElement('i');el.className='spark';el.style.background=colors[color];el.style.left=(p.x-4)+'px';el.style.top=(p.y-4)+'px';let a=Math.PI*2*i/5;el.style.setProperty('--dx',Math.cos(a)*24+'px');el.style.setProperty('--dy',Math.sin(a)*24+'px');m.append(el);setTimeout(()=>el.remove(),550)}}
+function updateProgress(){let done=totalBlocks-board.filter(v=>v!==null).length;let pct=totalBlocks?Math.round(done/totalBlocks*100):0;$('progressFill').style.width=pct+'%';$('progressText').textContent=pct+'% cleared'}
+function start(){document.getElementById('victory')?.remove();epoch++;clearInterval(clock);clearTimeout(winTimeout);clock=null;ended=false;reserved.clear();slots=Array(5).fill(null);board=levelBoard(level);totalBlocks=board.length;let counts=Array(5).fill(0);board.forEach(c=>counts[c]++);let all=[];counts.forEach((n,c)=>{while(n>0){let k=Math.min(4,n);all.push({c,n:k});n-=k}});all.sort((a,b)=>((a.c*7+a.n*3)%11)-((b.c*7+b.n*3)%11));queue=Array.from({length:5},()=>[]);all.forEach((b,i)=>queue[i%5].push(b));document.querySelectorAll('.traveler').forEach(x=>x.remove());render();$('status').textContent='Choose a beetle to begin.';updateProgress()}
+function render(){ $('previousLevel').disabled=level===0; $('level').textContent='Level '+(level+1)+((level+1)%5===0?' 🔥 HARD':'')+' · '+COLS+'×'+ROWS;const boardEl=$('board');boardEl.style.gridTemplateColumns=`repeat(${COLS},minmax(0,1fr))`;boardEl.style.aspectRatio=`${COLS}/${ROWS}`;let cells=boardEl.querySelectorAll('.cell');if(cells.length!==board.length){boardEl.querySelectorAll('.cell').forEach(x=>x.remove());for(let i=0;i<board.length;i++){let el=document.createElement('div');el.className='cell';boardEl.insertBefore(el,boardEl.firstChild)}}cells=boardEl.querySelectorAll('.cell');cells.forEach((el,i)=>{el.className=board[i]===null?'cell empty':'cell';el.style.background=board[i]===null?'':colors[board[i]]});$('slots').innerHTML=slots.map(s=>`<div class="slot ${s?'filled '+(s.busy?'working':'waiting'):''}" style="${s?'border-color:'+colors[s.c]:''}">${s?beetleHTML(s.c)+'<span class="count">'+s.n+'</span>':'+'}</div>`).join('');$('queue').innerHTML='';queue.forEach((col,c)=>{let holder=document.createElement('div');holder.className='queuecol';col.forEach((b,d)=>{let btn=document.createElement('button');btn.className='bug '+(d===0?'front':'locked');btn.style.background=colors[b.c];btn.innerHTML=beetleHTML(b.c)+'<span class="count">'+b.n+'</span>';btn.disabled=d!==0||ended||!slots.includes(null);btn.setAttribute('aria-label',d===0?'Available beetle':'Locked beetle');btn.onclick=()=>select(c);holder.append(btn)});$('queue').append(holder)})}
+function select(col){if(ended)return;let pos=slots.indexOf(null);if(pos<0||!queue[col]?.length)return;let b=queue[col].shift();slots[pos]={...b,busy:false,active:0,outbound:0,lastLaunch:0};render();$('status').textContent='Beetles launch one after another from each pad. Select more!';if(clock===null)clock=setInterval(tick,100);tick()}
+function pause(ms){return new Promise(r=>setTimeout(r,ms))}
+function pointAt(el){const r=el.getBoundingClientRect(),m=document.querySelector("main").getBoundingClientRect();return {x:r.left-m.left+r.width/2,y:r.top-m.top+r.height/2}}
+function cellPoint(x,y){const cells=$('board').querySelectorAll('.cell');const el=cells[y*COLS+x];if(!el)return pointAt($('board'));return pointAt(el)}
+function place(sprite,p){sprite.style.transform=`translate3d(${p.x-16}px,${p.y-16}px,0)`}
+// Animate the whole route with one continuous clock, constant distance-based speed,
+// and gently rounded corners. No stop/start easing at every grid square.
+function travel(sprite,points,token){return new Promise(resolve=>{
+ const filtered=points.filter((p,i)=>i===0||Math.hypot(p.x-points[i-1].x,p.y-points[i-1].y)>0.5);
+ if(filtered.length<2){resolve(true);return}
+ const smooth=[filtered[0]];
+ // Cut each corner slightly, keeping the beetle inside the same open corridor.
+ const radius=8;
+ for(let i=1;i<filtered.length-1;i++){
+  const prev=filtered[i-1],cur=filtered[i],next=filtered[i+1];
+  const d1=Math.hypot(cur.x-prev.x,cur.y-prev.y),d2=Math.hypot(next.x-cur.x,next.y-cur.y);
+  const cut=Math.min(radius,d1*.22,d2*.22);
+  if(cut<1){smooth.push(cur);continue}
+  const before={x:cur.x+(prev.x-cur.x)*cut/d1,y:cur.y+(prev.y-cur.y)*cut/d1};
+  const after={x:cur.x+(next.x-cur.x)*cut/d2,y:cur.y+(next.y-cur.y)*cut/d2};
+  smooth.push(before);
+  for(let j=1;j<=5;j++){let t=j/5,u=1-t;smooth.push({x:u*u*before.x+2*u*t*cur.x+t*t*after.x,y:u*u*before.y+2*u*t*cur.y+t*t*after.y})}
+ }
+ smooth.push(filtered[filtered.length-1]);
+ const cumulative=[0];for(let i=1;i<smooth.length;i++)cumulative.push(cumulative[i-1]+Math.hypot(smooth[i].x-smooth[i-1].x,smooth[i].y-smooth[i-1].y));
+ const total=cumulative[cumulative.length-1],duration=Math.max(240,total/165*1000);
+ let start=null,idx=1;
+ function frame(now){if(token!==epoch){sprite.remove();resolve(false);return}
+  if(start===null)start=now;
+  const t=Math.min(1,(now-start)/duration),distance=total*t;
+  while(idx<cumulative.length-1&&cumulative[idx]<distance)idx++;
+  const segment=cumulative[idx]-cumulative[idx-1]||1;
+  const f=Math.max(0,Math.min(1,(distance-cumulative[idx-1])/segment));
+  const x=smooth[idx-1].x+(smooth[idx].x-smooth[idx-1].x)*f;
+  const y=smooth[idx-1].y+(smooth[idx].y-smooth[idx-1].y)*f;
+  place(sprite,{x,y});
+  const dx=smooth[idx].x-smooth[idx-1].x,dy=smooth[idx].y-smooth[idx-1].y;
+  const heading=sprite.querySelector('.heading');
+  if(heading && (Math.abs(dx)+Math.abs(dy)>0.01)){heading.style.transform=`rotate(${Math.atan2(dy,dx)*180/Math.PI+90}deg)`}
+  if(t<1)requestAnimationFrame(frame);else resolve(true)
+ }
+ requestAnimationFrame(frame)
+})}
+// Each sprite is positioned in grid-cell units, so 100% is one cell.
+function pathTo(target){
+ const queue=[],prev=Array(board.length).fill(-2);
+ for(let c=0;c<COLS;c++){let i=(ROWS-1)*COLS+c;if(board[i]===null){prev[i]=-1;queue.push(i)}}
+ let dest=-1;
+ for(let k=0;k<queue.length;k++){let i=queue[k];if(neighbors(target).includes(i)){dest=i;break}
+  for(let j of neighbors(i))if(board[j]===null&&prev[j]===-2){prev[j]=i;queue.push(j)}
+ }
+ if(Math.floor(target/COLS)===ROWS-1)return [{x:target%COLS,y:ROWS}];
+ if(dest<0)return null;
+ let path=[];for(let i=dest;i>=0;i=prev[i]){path.push({x:i%COLS,y:Math.floor(i/COLS)});if(prev[i]===-1)break}
+ path.reverse();path.unshift({x:path[0].x,y:ROWS});return path;
+}
+async function collect(slotIndex,target,token){
+ const b=slots[slotIndex];if(!b)return;
+ const path=pathTo(target);
+ if(!path){reserved.delete(target);b.active=Math.max(0,b.active-1);b.outbound=Math.max(0,b.outbound-1);b.busy=b.active>0;return}
+ const slotEl=$('slots').children[slotIndex];
+ const home=pointAt(slotEl);
+ const boardRect=$('board').getBoundingClientRect(),mainRect=document.querySelector('main').getBoundingClientRect();
+ const entry=cellPoint(path[0].x,ROWS-1);
+ const outside={x:entry.x,y:boardRect.bottom-mainRect.top+19};
+ const route=[home,outside,...path.map(p=>p.y===ROWS?outside:cellPoint(p.x,p.y)),cellPoint(target%COLS,Math.floor(target/COLS))];
+ const sprite=document.createElement('div');sprite.className='traveler';sprite.innerHTML='<span class="heading">'+beetleHTML(b.c)+'</span>';
+
+ document.querySelector("main").append(sprite);place(sprite,home);
+ const cleanup=()=>{sprite.remove();reserved.delete(target)};
+ if(!await travel(sprite,route,token)){cleanup();return}
+ if(token!==epoch){cleanup();return}
+ b.outbound=Math.max(0,b.outbound-1);
+ if(board[target]===b.c){board[target]=null;b.n--;sparkle(target,b.c);beep(460+b.c*85);render();updateProgress()}
+ sprite.classList.add('carrying');
+ if(!await travel(sprite,[...route].reverse(),token)){cleanup();return}
+ cleanup();if(token!==epoch)return;
+ b.active=Math.max(0,b.active-1);if(b.n<=0&&b.active===0)slots[slotIndex]=null;else b.busy=b.active>0;
+ render();tick();
+}
+function showVictory(){
+ const overlay=document.createElement('div');overlay.id='victory';
+ overlay.innerHTML='<div class="victoryCard"><div class="victoryFlower">🌸 🪲 🌸</div><h2>Garden cleared!</h2><p>Great work! Your garden is blooming. Ready for the next puzzle?</p><button id="nextLevel">Next level →</button></div>';
+ document.querySelector('main').append(overlay);
+ $('nextLevel').onclick=()=>changeLevel(1);
+}
+function tick(){
+ if(ended)return;
+ const dist=reachable();let started=false,now=performance.now();
+ for(let s=0;s<slots.length;s++){
+  const b=slots[s];if(!b)continue;
+  // Launch every available beetle in sequence; each target is reserved.
+  // Cap visible sprites only to protect slower mobile devices.
+  const totalActive=slots.reduce((sum,p)=>sum+(p?p.active:0),0);
+  if(totalActive>=24||b.n<=b.outbound||now-b.lastLaunch<160)continue;
+  const target=targetFor(b.c,dist);if(target<0)continue;
+  b.active++;b.outbound++;b.busy=true;b.lastLaunch=now;
+  reserved.add(target);started=true;collect(s,target,epoch);
+ }
+ if(board.every(v=>v===null)&&reserved.size===0){
+  ended=true;clearInterval(clock);clock=null;render();$('status').textContent='🌸 Level complete! Next level loading...';
+  beep(840);showVictory();return;
+ }
+ const working=slots.some(s=>s&&s.active>0),blocked=slots.some(s=>s&&s.active===0);
+ if(!working&&!started){
+  clearInterval(clock);clock=null;
+  if(blocked&&!slots.includes(null)){ended=true;$('status').textContent='All five slots are blocked! Restart to try again.'}
+  else if(blocked){$('status').textContent='Some beetles are blocked. Choose a color to open a path.'}
+  else $('status').textContent='Choose another beetle.';
+  render();
+ }
+}
+function changeLevel(delta){level=Math.max(0,level+delta);try{localStorage.setItem('beetleBloomLevel',String(level))}catch(e){}start()}
+$('hint').onclick=()=>{
+ const dist=reachable();
+ const candidates=[];
+ for(let col=0;col<queue.length;col++){
+  const front=queue[col][0];
+  if(front&&targetFor(front.c,dist)>=0)candidates.push({color:front.c,col});
+ }
+ if(candidates.length){
+  const choice=candidates[0];
+  $('status').textContent='💡 Try the front beetle in column '+(choice.col+1)+' — its color is reachable.';
+  $('queue').children[choice.col]?.firstElementChild?.classList.add('hintGlow');
+ }else{
+  const active=slots.find(s=>s&&targetFor(s.c,dist)>=0);
+  $('status').textContent=active?'💡 Your selected beetles can clear a reachable block.':'💡 No available front beetle can reach a block right now. You may need to restart.';
+ }
+};
+$('skipLevel').onclick=()=>changeLevel(1);$('previousLevel').onclick=()=>changeLevel(-1);$('reset').onclick=start;$('sound').onclick=()=>{soundOn=!soundOn;$('sound').textContent=soundOn?'🔊 Sound on':'🔇 Sound off'};start();
+</script></body></html>
